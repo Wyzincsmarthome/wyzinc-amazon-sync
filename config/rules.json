@@ -1,0 +1,91 @@
+{
+  "pricing": {
+    "vat_rate": 0.21,
+    "shipping_cost": 4.00,
+    "amazon_referral": {
+      "tier_1": {
+        "threshold": 100.0,
+        "rate": 0.15
+      },
+      "tier_2": {
+        "threshold": null,
+        "rate": 0.08
+      }
+    },
+    "dst_surcharge": 0.02,
+    "undercut_step": 0.01,
+    "margin_tiers": [
+      {
+        "min_cost": 0.01,
+        "max_cost": 4.99,
+        "margin": 0.16
+      },
+      {
+        "min_cost": 5.0,
+        "max_cost": 14.99,
+        "margin": 0.15
+      },
+      {
+        "min_cost": 15.0,
+        "max_cost": 24.99,
+        "margin": 0.13
+      },
+      {
+        "min_cost": 25.0,
+        "max_cost": 39.99,
+        "margin": 0.11
+      },
+      {
+        "min_cost": 40.0,
+        "max_cost": 64.99,
+        "margin": 0.09
+      },
+      {
+        "min_cost": 65.0,
+        "max_cost": 89.99,
+        "margin": 0.07
+      },
+      {
+        "min_cost": 90.0,
+        "max_cost": 119.99,
+        "margin": 0.06
+      },
+      {
+        "min_cost": 120.0,
+        "max_cost": 999999.99,
+        "margin": 0.05
+      }
+    ]
+  },
+  "matching": {
+    "priorities": [
+      "ean",
+      "part_number",
+      "keywords"
+    ],
+    "min_similarity_score": 0.70
+  },
+  "suppliers": {
+    "visiotech": {
+      "allowed_brands": ["Ajax", "Aqara", "Yale"]
+    },
+    "suprides": {
+      "brand_blocklist": [
+        "Acer", "AMD", "Apple", "Asus", "Axis", "Brother", "Cooler Master",
+        "Crucial", "DDIGITAL", "DJI", "Dell", "ELAGO", "Equip", "Ewent",
+        "Extreme", "Gigaset", "HP", "Hoto", "Inmove", "Jabra", "Kobo",
+        "Livall", "Maxtor", "Microsoft", "PNY", "QDOS", "Rapoo", "Roidmi",
+        "SKYPOS", "SUNMI", "Samsung", "Satechi", "Serviços", "Seiko",
+        "Socomec", "Spirit of Gamer", "TCL", "Team Group", "Tech-Protect",
+        "Tooq", "Toshiba", "Trust", "Ubiquiti", "Vekoby", "Vivo", "Wozinsky",
+        "Yealink"
+      ],
+      "stock_mapping": {
+        "0": 0,
+        "<2": 1,
+        "<10": 5,
+        ">10": 10
+      }
+    }
+  }
+}
