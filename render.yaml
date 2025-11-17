@@ -1,0 +1,50 @@
+services:
+  - type: web
+    name: wyzinc-amazon-sync
+    env: python
+    region: frankfurt
+    plan: starter  # Free tier
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: FLASK_ENV
+        value: production
+      # Secrets (configura no Render Dashboard)
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SIMULATE_MODE
+        value: "true"
+      - key: LOG_LEVEL
+        value: INFO
+      # Amazon SP-API (adiciona manualmente no dashboard)
+      - key: MARKETPLACE_ID
+        sync: false
+      - key: SELLER_ID
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: LWA_CLIENT_ID
+        sync: false
+      - key: LWA_CLIENT_SECRET
+        sync: false
+      - key: LWA_REFRESH_TOKEN
+        sync: false
+      # Suprides (adiciona manualmente)
+      - key: SUPRIDES_BEARER
+        sync: false
+      - key: SUPRIDES_USER
+        sync: false
+      - key: SUPRIDES_PASSWORD
+        sync: false
+
+  # Opcional: Cron job para sincronização diária
+  # - type: cron
+  #   name: wyzinc-daily-sync
+  #   env: python
+  #   schedule: "0 7 * * *"  # 7h UTC (8h Lisbon)
+  #   buildCommand: pip install -r requirements.txt
+  #   startCommand: python scripts/daily_sync.py
