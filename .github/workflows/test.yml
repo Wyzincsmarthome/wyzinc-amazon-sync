@@ -1,0 +1,88 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create dummy .env
+        run: |
+          cp .env.example .env
+
+      - name: Test pricing engine
+        run: |
+          python -c "
+          from src.core.pricing import pricing_engine
+          
+          # Test 1: Cost 10€, margin 16%
+          result = pricing_engine.calculate_price(cost=10.0)
+          assert result.cost == 10.0
+          assert result.margin_used == 0.16
+          assert 20.0 <= result.floor_price <= 25.0  # Approximate range
+          print(f'✓ Test 1 passed: Floor price {result.floor_price}€')
+          
+          # Test 2: Cost 50€, margin 9%, with competitor
+          result = pricing_engine.calculate_price(cost=50.0, competitor_price=70.0)
+          assert result.competitor_price == 70.0
+          assert result.final_price == 69.99
+          print(f'✓ Test 2 passed: Undercut to {result.final_price}€')
+          
+          # Test 3: Cost 100€, margin 6%
+          result = pricing_engine.calculate_price(cost=100.0)
+          assert result.margin_used == 0.06
+          print(f'✓ Test 3 passed: High-cost tier {result.floor_price}€')
+          
+          print('\\n✅ All pricing tests passed!')
+          "
+
+      - name: Test settings loading
+        run: |
+          python -c "
+          from config.settings import settings
+          
+          assert settings.marketplace_id == 'A1RKKUPIHCS9HS'
+          assert settings.flask_env == 'production'
+          assert settings.simulate_mode == True
+          
+          rules = settings.load_rules()
+          assert rules['pricing']['vat_rate'] == 0.21
+          assert rules['pricing']['shipping_cost'] == 4.0
+          
+          print('✅ Settings validation passed!')
+          "
+
+      - name: Lint with flake8 (optional)
+        continue-on-error: true
+        run: |
+          pip install flake8
+          flake8 src/ config/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 src/ config/ --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
