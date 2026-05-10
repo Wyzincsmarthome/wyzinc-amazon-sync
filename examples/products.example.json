@@ -1,0 +1,26 @@
+[
+  {
+    "sku": "WZ-AJAX-HUB-001",
+    "cost": 89.50,
+    "stock": 15,
+    "ean": "4823114015236",
+    "brand": "Ajax",
+    "title": "Ajax Hub 2 alarm panel"
+  },
+  {
+    "sku": "WZ-AQARA-CAM-G3",
+    "cost": 55.00,
+    "stock": 3,
+    "ean": "6970504217645",
+    "brand": "Aqara",
+    "title": "Aqara Camera Hub G3"
+  },
+  {
+    "sku": "WZ-YALE-LOCK-L1",
+    "cost": 180.00,
+    "stock": 0,
+    "ean": "5057874045312",
+    "brand": "Yale",
+    "title": "Yale Linus Smart Lock"
+  }
+]

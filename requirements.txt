@@ -23,6 +23,12 @@ numpy==1.26.3
 # Amazon SP-API signing
 requests-auth-aws-sigv4==0.7
 
+# Amazon SP-API client (handles LWA, signing, retries)
+python-amazon-sp-api==1.8.20
+
+# Scheduler for daily sync jobs
+APScheduler==3.10.4
+
 # Testing (dev)
 pytest==7.4.3
 pytest-cov==4.1.0
