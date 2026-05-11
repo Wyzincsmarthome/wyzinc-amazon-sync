@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     simulate_mode: bool = Field(default=True)
     brand_blocklist: str = Field(default="")
 
+    # Scheduled sync job
+    sync_enabled: bool = Field(default=False)
+    sync_cron: str = Field(default="0 6 * * *")  # daily 06:00 Europe/Madrid
+    sync_source: Literal["csv", "visiotech"] = Field(default="csv")
+    sync_input_file: str = Field(default="")
+
     # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     log_format: Literal["json", "text"] = Field(default="json")

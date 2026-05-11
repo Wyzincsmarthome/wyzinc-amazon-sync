@@ -1,100 +1,82 @@
-# config/settings.py
+# src/core/pricing.py
 """
-Centralized configuration management using Pydantic Settings.
-All environment variables are validated and typed.
+Pricing engine. Calculates the final Amazon selling price from a cost,
+using margin tiers, VAT, shipping, Amazon referral fee and DST surcharge
+defined in config/rules.json.
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import Literal
+from dataclasses import dataclass
+from typing import Optional
 
-from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from config.settings import settings
 
 
-class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    # Flask
-    flask_env: Literal["development", "production"] = Field(default="production")
-    secret_key: str = Field(default="change-me")
-    port: int = Field(default=5000)
-
-    # Amazon SP-API
-    spapi_endpoint: str = Field(default="https://sellingpartnerapi-eu.amazon.com")
-    marketplace_id: str = Field(default="A1RKKUPIHCS9HS")
-    seller_id: str = Field(default="")
-    aws_region: str = Field(default="eu-west-1")
-    aws_access_key_id: str = Field(default="")
-    aws_secret_access_key: str = Field(default="")
-    lwa_client_id: str = Field(default="")
-    lwa_client_secret: str = Field(default="")
-    lwa_refresh_token: str = Field(default="")
-
-    # Suprides API
-    suprides_base_url: str = Field(default="https://www.suprides.pt")
-    suprides_products_path: str = Field(default="/rest/V1/integration/products-list")
-    suprides_bearer: str = Field(default="")
-    suprides_user: str = Field(default="")
-    suprides_password: str = Field(default="")
-    suprides_limit: int = Field(default=250)
-
-    # Storage
-    storage_provider: Literal["local", "s3"] = Field(default="local")
-    s3_bucket: str = Field(default="")
-    s3_region: str = Field(default="eu-west-1")
-    s3_prefix: str = Field(default="")
-
-    # Features
-    simulate_mode: bool = Field(default=True)
-    brand_blocklist: str = Field(default="")
-
-    # Logging
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
-    log_format: Literal["json", "text"] = Field(default="json")
-
-    @field_validator("spapi_endpoint", "suprides_base_url")
-    @classmethod
-    def strip_trailing_slash(cls, v: str) -> str:
-        """Remove trailing slashes from URLs."""
-        return v.rstrip("/")
-
-    @field_validator("brand_blocklist")
-    @classmethod
-    def parse_blocklist(cls, v: str) -> str:
-        """Normalize brand blocklist (kept as string, parsed on demand)."""
-        return v.strip()
-
-    @property
-    def brand_blocklist_set(self) -> set[str]:
-        """Parse blocklist into a set of lowercase brand names."""
-        if not self.brand_blocklist:
-            return set()
-        return {b.strip().lower() for b in self.brand_blocklist.split(",") if b.strip()}
-
-    @property
-    def data_dir(self) -> Path:
-        """Local data directory."""
-        path = Path(__file__).parent.parent / "data"
-        path.mkdir(parents=True, exist_ok=True)
-        return path
-
-    def load_rules(self) -> dict:
-        """Load business rules from rules.json."""
-        rules_path = Path(__file__).parent / "rules.json"
-        if not rules_path.exists():
-            raise FileNotFoundError(f"Rules file not found: {rules_path}")
-        with rules_path.open("r", encoding="utf-8") as f:
-            return json.load(f)
+@dataclass(frozen=True)
+class PricingResult:
+    cost: float
+    floor_price: float
+    final_price: float
+    margin_used: float
 
 
-# Global settings instance
-settings = Settings()
+class PricingEngine:
+    def __init__(self) -> None:
+        rules = settings.load_rules()["pricing"]
+        self.vat_rate: float = rules["vat_rate"]
+        self.shipping_cost: float = rules["shipping_cost"]
+        self.dst_surcharge: float = rules["dst_surcharge"]
+        self.undercut_step: float = rules["undercut_step"]
+        self.margin_tiers: list[dict] = rules["margin_tiers"]
+        self.referral_tiers: dict = rules["amazon_referral"]
+
+    def _margin_for_cost(self, cost: float) -> float:
+        for tier in self.margin_tiers:
+            if tier["min_cost"] <= cost <= tier["max_cost"]:
+                return float(tier["margin"])
+        return float(self.margin_tiers[-1]["margin"])
+
+    def _referral_rate(self, gross_price: float) -> float:
+        tier_1 = self.referral_tiers["tier_1"]
+        if gross_price <= tier_1["threshold"]:
+            return float(tier_1["rate"])
+        return float(self.referral_tiers["tier_2"]["rate"])
+
+    def calculate_price(
+        self,
+        cost: float,
+        competitor_price: Optional[float] = None,
+    ) -> PricingResult:
+        if cost <= 0:
+            raise ValueError("cost must be positive")
+
+        margin = self._margin_for_cost(cost)
+        base = cost + self.shipping_cost
+        # gross = base * (1 + vat) * (1 + dst) / (1 - referral - margin)
+        # Solve iteratively because referral depends on gross.
+        gross = base * (1 + self.vat_rate) * (1 + self.dst_surcharge)
+        for _ in range(8):
+            referral = self._referral_rate(gross)
+            denom = 1 - referral - margin
+            if denom <= 0:
+                raise ValueError("margin + referral >= 1, cannot price")
+            new_gross = base * (1 + self.vat_rate) * (1 + self.dst_surcharge) / denom
+            if abs(new_gross - gross) < 0.005:
+                gross = new_gross
+                break
+            gross = new_gross
+
+        floor_price = round(gross, 2)
+        final_price = floor_price
+        if competitor_price is not None and competitor_price - self.undercut_step >= floor_price:
+            final_price = round(competitor_price - self.undercut_step, 2)
+
+        return PricingResult(
+            cost=cost,
+            floor_price=floor_price,
+            final_price=final_price,
+            margin_used=margin,
+        )
+
+
+pricing_engine = PricingEngine()

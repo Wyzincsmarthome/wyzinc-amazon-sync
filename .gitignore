@@ -48,6 +48,8 @@ data/
 *.json
 !config/rules.json
 !package.json
+!examples/*.json
+!examples/*.csv
 
 # Logs
 logs/
