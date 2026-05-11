@@ -1,17 +1,22 @@
 # src/amazon/client.py
 """Thin wrapper around python-amazon-sp-api.
 
-Centralises credentials and marketplace selection so the rest of the code can
-just import the helpers it needs.
+Since 2 October 2023 the SP-API no longer requires AWS Sig V4 signing -
+Amazon discards the signature and only checks the LWA access token. We
+therefore pass empty AWS credentials and never read AWS_* from the env.
 """
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
-from sp_api.api import Feeds, Sellers
-from sp_api.base import Marketplaces
+# Silence the library's startup donation banner.
+os.environ.setdefault("ENV_DISABLE_DONATION_MSG", "1")
 
-from config.settings import settings
+from sp_api.api import Feeds, Sellers  # noqa: E402
+from sp_api.base import Marketplaces  # noqa: E402
+
+from config.settings import settings  # noqa: E402
 
 
 def _credentials() -> dict:
@@ -19,13 +24,15 @@ def _credentials() -> dict:
         "refresh_token": settings.lwa_refresh_token,
         "lwa_app_id": settings.lwa_client_id,
         "lwa_client_secret": settings.lwa_client_secret,
-        "aws_access_key": settings.aws_access_key_id,
-        "aws_secret_key": settings.aws_secret_access_key,
+        # SP-API no longer validates these (Oct 2023). Pass empty strings so
+        # the SDK skips its signing step instead of looking up AWS env vars.
+        "aws_access_key": "",
+        "aws_secret_key": "",
     }
 
 
 def _marketplace() -> Marketplaces:
-    # Spain = ES. The library exposes Marketplaces.ES which maps to A1RKKUPIHCS9HS.
+    # Spain marketplace id A1RKKUPIHCS9HS maps to Marketplaces.ES.
     return Marketplaces.ES
 
 
