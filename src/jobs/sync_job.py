@@ -80,11 +80,15 @@ def run_sync(
     source: str = "csv",
     input_file: Optional[str] = None,
     dry_run: bool = False,
+    limit: Optional[int] = None,
+    only_skus: Optional[list[str]] = None,
 ) -> dict:
     """Run a full sync. Returns a summary dict written to data/reports/.
 
     dry_run=True (or settings.simulate_mode) builds the feed and saves it locally
     without sending it to Amazon.
+    limit caps the number of updates sent (applied AFTER pricing/filtering).
+    only_skus restricts to an explicit list of seller SKUs.
     """
     started_at = datetime.utcnow().isoformat() + "Z"
     cat = _build_source(source, input_file)
@@ -93,12 +97,25 @@ def run_sync(
 
     updates = build_updates(records, supplier=cat.name)
 
+    if only_skus:
+        wanted = {s.strip() for s in only_skus if s.strip()}
+        before = len(updates)
+        updates = [u for u in updates if u.sku in wanted]
+        logger.info("only_skus filter: %d -> %d", before, len(updates))
+
+    if limit is not None and limit > 0:
+        before = len(updates)
+        updates = updates[:limit]
+        logger.info("limit applied: %d -> %d", before, len(updates))
+
     summary: dict = {
         "started_at": started_at,
         "source": source,
         "input_file": input_file,
         "records_fetched": len(records),
         "updates_built": len(updates),
+        "limit": limit,
+        "only_skus": list(only_skus) if only_skus else None,
         "dry_run": dry_run or settings.simulate_mode,
         "feeds": [],
     }

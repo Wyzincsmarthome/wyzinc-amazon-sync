@@ -23,8 +23,16 @@ from src.jobs.sync_job import run_sync  # noqa: E402
 def main() -> int:
     parser = argparse.ArgumentParser(description="Trigger an Amazon sync now.")
     parser.add_argument("--source", choices=["csv", "visiotech"], default="csv")
-    parser.add_argument("--file", help="Input CSV/JSON path (required for source=csv)")
+    parser.add_argument("--file", help="Input CSV/JSON/XLSX path")
     parser.add_argument("--dry-run", action="store_true", help="Build feed but do not submit")
+    parser.add_argument(
+        "--limit", type=int, default=None,
+        help="Cap the number of SKUs sent (useful for first tests).",
+    )
+    parser.add_argument(
+        "--sku", default=None,
+        help="Comma-separated list of SKUs to restrict the sync to.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -32,7 +40,14 @@ def main() -> int:
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    summary = run_sync(source=args.source, input_file=args.file, dry_run=args.dry_run)
+    only_skus = [s.strip() for s in args.sku.split(",")] if args.sku else None
+    summary = run_sync(
+        source=args.source,
+        input_file=args.file,
+        dry_run=args.dry_run,
+        limit=args.limit,
+        only_skus=only_skus,
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 
