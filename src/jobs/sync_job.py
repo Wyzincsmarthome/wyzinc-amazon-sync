@@ -27,9 +27,15 @@ def _build_source(source_name: str, input_file: Optional[str]) -> CatalogSource:
             raise ValueError("source=csv requires input_file")
         return CsvJsonSource(input_file)
     if source_name == "visiotech":
+        path = input_file or settings.visiotech_file
+        if not path:
+            raise ValueError(
+                "source=visiotech needs a file path. Set VISIOTECH_FILE in .env "
+                "or pass --file to sync_now.py."
+            )
         rules = settings.load_rules()
         allowed = rules.get("suppliers", {}).get("visiotech", {}).get("allowed_brands", [])
-        return VisiotechSource(allowed_brands=allowed)
+        return VisiotechSource(path=path, allowed_brands=allowed)
     raise ValueError(f"unknown source: {source_name}")
 
 

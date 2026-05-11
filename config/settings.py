@@ -63,6 +63,9 @@ class Settings(BaseSettings):
     sync_source: Literal["csv", "visiotech"] = Field(default="csv")
     sync_input_file: str = Field(default="")
 
+    # Visiotech XLSX catalog (used when sync_source=visiotech).
+    visiotech_file: str = Field(default="")
+
     # Logging
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = Field(default="INFO")
     log_format: Literal["json", "text"] = Field(default="json")
