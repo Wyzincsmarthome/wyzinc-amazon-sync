@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row mb-3">
+  <div class="col">
+    <div class="card">
+      <div class="card-body py-2">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <div class="d-flex flex-wrap gap-3 small">
+              {% for label, key in [
+                  ('Total','all'),
+                  ('Por analisar','unscanned'),
+                  ('Já listados','listed'),
+                  ('EAN match','ean_match'),
+                  ('Revisão','needs_review'),
+                  ('Sem match','no_match'),
+                  ('Aprovados','approved'),
+                  ('Criados','created'),
+                  ('Falhados','failed'),
+                  ('Erro','error'),
+                  ('Ignorados','skipped')] %}
+                {% set total = counts.values()|sum if key == 'all' else counts.get(key, 0) %}
+                <a href="?status={{ key }}{% if search %}&q={{ search }}{% endif %}"
+                   class="text-decoration-none {% if status_filter == key %}fw-bold{% endif %}">
+                  <span class="badge badge-status badge-{{ key }}">{{ total }}</span>
+                  {{ label }}
+                </a>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="col-md-4 text-end">
+            <form method="post" action="{{ url_for('ingest') }}" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-outline-secondary">1. Carregar XLSX</button>
+            </form>
+            <form method="post" action="{{ url_for('scan') }}" class="d-inline">
+              <input type="number" name="limit" class="form-control form-control-sm d-inline" style="width:80px" placeholder="limite">
+              <button type="submit" class="btn btn-sm btn-outline-primary" {% if scan_state.running %}disabled{% endif %}>
+                2. Analisar Amazon
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('create_all') }}" class="d-inline"
+                  onsubmit="return confirm('Enviar TODOS os aprovados para criação na Amazon?')">
+              <button type="submit" class="btn btn-sm btn-success">3. Criar aprovados</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if scan_state.running or (scan_state.summary and not scan_state.summary.get('error')) %}
+<div id="scan-progress" class="alert alert-info py-2 small">
+  {% if scan_state.running %}
+    Análise em progresso: <span id="scan-done">{{ scan_state.done }}</span> / <span id="scan-total">{{ scan_state.total }}</span>
+  {% elif scan_state.summary %}
+    Última análise: {{ scan_state.summary }}
+  {% endif %}
+</div>
+{% endif %}
+
+<form method="get" class="row g-2 mb-2">
+  <div class="col-auto">
+    <input type="text" class="form-control form-control-sm" name="q" value="{{ search }}" placeholder="Procurar SKU / EAN / título">
+  </div>
+  <div class="col-auto">
+    <input type="hidden" name="status" value="{{ status_filter }}">
+    <button class="btn btn-sm btn-outline-secondary">Filtrar</button>
+    <a class="btn btn-sm btn-link" href="{{ url_for('dashboard') }}">Limpar</a>
+  </div>
+</form>
+
+<form method="post" action="{{ url_for('bulk_approve') }}">
+<div class="card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:30px"><input type="checkbox" id="check-all"></th>
+            <th>SKU</th>
+            <th>Marca</th>
+            <th>Título</th>
+            <th class="text-end">Custo</th>
+            <th class="text-end">Preço</th>
+            <th class="text-end">Qty</th>
+            <th>EAN</th>
+            <th>Estado</th>
+            <th>ASIN</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td>
+              {% if p.status == 'ean_match' %}
+                <input type="checkbox" name="sku" value="{{ p.sku }}">
+              {% endif %}
+            </td>
+            <td class="sku-cell">{{ p.sku }}</td>
+            <td>{{ p.brand or '' }}</td>
+            <td><small>{{ (p.title or '')[:80] }}</small></td>
+            <td class="text-end">{{ '%.2f'|format(p.cost) }} &euro;</td>
+            <td class="text-end fw-bold">{{ '%.2f'|format(p.final_price) }} &euro;</td>
+            <td class="text-end">{{ p.quantity }}</td>
+            <td class="sku-cell"><small>{{ p.ean or '' }}</small></td>
+            <td><span class="badge badge-status badge-{{ p.status }}">{{ p.status }}</span></td>
+            <td class="sku-cell"><small>{{ p.asin or '' }}</small></td>
+            <td class="text-nowrap">
+              {% if p.status == 'needs_review' %}
+                <a href="{{ url_for('review', sku=p.sku) }}" class="btn btn-sm btn-outline-warning">Rever</a>
+              {% elif p.status == 'ean_match' %}
+                <form method="post" action="{{ url_for('approve_one', sku=p.sku) }}" class="d-inline">
+                  <input type="hidden" name="asin" value="{{ p.asin }}">
+                  <button class="btn btn-sm btn-outline-success">Aprovar</button>
+                </form>
+              {% endif %}
+              {% if p.status not in ('listed','created','skipped') %}
+                <form method="post" action="{{ url_for('skip_one', sku=p.sku) }}" class="d-inline">
+                  <button class="btn btn-sm btn-outline-secondary">Ignorar</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" class="text-center text-muted py-4">
+            Sem produtos. Carrega o XLSX da Visiotech primeiro (botão "1. Carregar XLSX").
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% if products %}
+  <div class="card-footer py-2 d-flex justify-content-between">
+    <small class="text-muted">{{ products|length }} linhas</small>
+    <button type="submit" class="btn btn-sm btn-primary"
+            onclick="return confirm('Aprovar todos os EAN match seleccionados?')">
+      Aprovar seleccionados (EAN match)
+    </button>
+  </div>
+  {% endif %}
+</div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('check-all')?.addEventListener('change', function(e) {
+  document.querySelectorAll('input[name="sku"]').forEach(cb => cb.checked = e.target.checked);
+});
+{% if scan_state.running %}
+const tick = setInterval(async () => {
+  const r = await fetch('{{ url_for("scan_status") }}');
+  const s = await r.json();
+  if (!s.running) { clearInterval(tick); location.reload(); return; }
+  document.getElementById('scan-done').textContent = s.done;
+  document.getElementById('scan-total').textContent = s.total;
+}, 2000);
+{% endif %}
+</script>
+{% endblock %}

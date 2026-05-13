@@ -13,7 +13,7 @@ from functools import lru_cache
 # Silence the library's startup donation banner.
 os.environ.setdefault("ENV_DISABLE_DONATION_MSG", "1")
 
-from sp_api.api import Feeds, Sellers  # noqa: E402
+from sp_api.api import CatalogItems, Feeds, ListingsItems, Sellers  # noqa: E402
 from sp_api.base import Marketplaces  # noqa: E402
 
 from config.settings import settings  # noqa: E402
@@ -44,3 +44,13 @@ def get_feeds_client() -> Feeds:
 @lru_cache(maxsize=1)
 def get_sellers_client() -> Sellers:
     return Sellers(credentials=_credentials(), marketplace=_marketplace())
+
+
+@lru_cache(maxsize=1)
+def get_catalog_client() -> CatalogItems:
+    return CatalogItems(credentials=_credentials(), marketplace=_marketplace())
+
+
+@lru_cache(maxsize=1)
+def get_listings_client() -> ListingsItems:
+    return ListingsItems(credentials=_credentials(), marketplace=_marketplace())

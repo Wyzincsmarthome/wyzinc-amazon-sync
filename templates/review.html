@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Rever {{ product.sku }}{% endblock %}
+{% block content %}
+<a href="{{ url_for('dashboard') }}" class="text-decoration-none">&larr; voltar</a>
+
+<div class="card my-3">
+  <div class="card-body">
+    <h5 class="card-title mb-0 sku-cell">{{ product.sku }}</h5>
+    <small class="text-muted">{{ product.brand }} &middot; {{ product.title }}</small>
+    <div class="mt-2 small">
+      Custo: <b>{{ '%.2f'|format(product.cost) }} &euro;</b> &middot;
+      Preço Amazon: <b>{{ '%.2f'|format(product.final_price) }} &euro;</b> &middot;
+      Stock anunciado: <b>{{ product.quantity }}</b> &middot;
+      EAN: <code>{{ product.ean or '(em falta)' }}</code>
+    </div>
+  </div>
+</div>
+
+<h6>Candidatos encontrados na Amazon por título</h6>
+{% if candidates %}
+<div class="card">
+<div class="table-responsive">
+<table class="table table-sm table-hover mb-0">
+  <thead class="table-light">
+    <tr>
+      <th>Img</th>
+      <th>ASIN</th>
+      <th>Marca</th>
+      <th>Título Amazon</th>
+      <th class="text-end">Score</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in candidates %}
+    <tr>
+      <td>
+        {% if c.image_url %}
+          <img src="{{ c.image_url }}" style="height:40px">
+        {% endif %}
+      </td>
+      <td class="sku-cell">{{ c.asin }}</td>
+      <td>{{ c.brand }}</td>
+      <td><small>{{ c.title or '' }}</small></td>
+      <td class="text-end"><small>{{ '%.2f'|format(c.score or 0) }}</small></td>
+      <td>
+        <form method="post" action="{{ url_for('approve_one', sku=product.sku) }}">
+          <input type="hidden" name="asin" value="{{ c.asin }}">
+          <button class="btn btn-sm btn-success">Usar este ASIN</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</div>
+{% else %}
+<div class="alert alert-warning">Sem candidatos guardados para este SKU.</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('skip_one', sku=product.sku) }}" class="mt-3">
+  <button class="btn btn-outline-secondary">Ignorar este SKU</button>
+</form>
+{% endblock %}
